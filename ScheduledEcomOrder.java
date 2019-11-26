@@ -47,11 +47,11 @@ public class ScheduledEcomTransaction {
 
   @Autowired HttpService httpService;
 
-  /** Get all expired order (order in CREATED, PENDING status) to synchronize */
+  /** Get all expired order to synchronize */
   @Scheduled(fixedDelayString = "900000") // time in milliseconds (15 min)
   private void updateExpiredTransaction() {
     try {
-      // Order with more than 45 minutes of no-action taking is considered as expired order
+      // Order with more than 45 minutes of no-action taking (in CREATED/PENDING status) is considered as expired order
       Date startTime = new DateTime().minusDays(1).minusMinutes(45).toDate();
       Date endTime = new DateTime().minusMinutes(45).toDate();
       log.info(
