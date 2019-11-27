@@ -47,7 +47,7 @@ public class ScheduledEcomTransaction {
 
   @Autowired HttpService httpService;
 
-  /** Get all expired order to synchronize */
+  /** Get all expired transaction to synchronize */
   @Scheduled(fixedDelayString = "900000") // time in milliseconds (15 min)
   private void updateExpiredTransaction() {
     try {
@@ -58,14 +58,14 @@ public class ScheduledEcomTransaction {
           "(updateExpiredTransaction) startUpdateTime: {} - endUpdateTime: {}", startTime, endTime);
       List<String> listStatus = Arrays.asList(PaymentStatus.CREATED, PaymentStatus.PENDING);
 
-      // Get expired orders
-      List<EcomTransaction> orderList =
+      // Get expired transactions
+      List<EcomTransaction> transactionList =
           ecomTransactionService.findOrdersByStatusIn(startTime, endTime, listStatus);
-      log.info("(updateExpiredTransaction) numberContact: {}", orderList.size());
+      log.info("(updateExpiredTransaction) numberContact: {}", transactionList.size());
 
-      // Synchronize orders
+      // Synchronize transactions
       for (EcomTransaction transaction : transactionList) {
-        syncOrderExpired(transaction);
+        syncExpiredTransaction(transaction);
       }
 
       log.info("(updateExpiredTransaction) END");
@@ -82,18 +82,18 @@ public class ScheduledEcomTransaction {
   private void syncExpiredTransaction(EcomTransaction transaction) {
     log.info("(syncExpiredTransaction) START, chargeId: {}", order.getChargeId());
 
-    String originOrderStatus = order.getStatus();
+    String originTransactionStatus = transaction.getStatus();
 
     // step 1: sync transaction
-    order.setStatus(PaymentStatus.TIMEOUT);
-    order.setTimeOutAt(new Date());
-    ecomTransactionService.save(order);
+    transaction.setStatus(PaymentStatus.TIMEOUT);
+    transaction.setTimeOutAt(new Date());
+    ecomTransactionService.save(transaction);
 
     // step 2: sync activation code and cancel course
     List<EcomCode> ecomCodeList = ecomCodeService.findByEcomTransactionId(transaction.getId());
 
     if (ecomCodeList == null) {
-      log.info("ERROR_ECOM_CODE_NULL; ecomTransactionId: {}", order.getId());
+      log.info("ERROR_ECOM_CODE_NULL; ecomTransactionId: {}", transaction.getId());
       return;
     }
 
