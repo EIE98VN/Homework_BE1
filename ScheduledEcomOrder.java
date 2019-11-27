@@ -14,7 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import vn.edu.topica.eco.epayment.constant.PaymentStatus;
 import vn.edu.topica.eco.epayment.exception.RecoverEx;
-import vn.edu.topica.eco.epayment.model.EcomOrder;
+import vn.edu.topica.eco.epayment.model.EcomTransaction;
 import vn.edu.topica.eco.epayment.model.support.*;
 import vn.edu.topica.eco.epayment.service.*;
 import vn.edu.topica.eco.epayment.util.ErrorLogger;
@@ -51,7 +51,8 @@ public class ScheduledEcomTransaction {
   @Scheduled(fixedDelayString = "900000") // time in milliseconds (15 min)
   private void updateExpiredTransaction() {
     try {
-      // Order with more than 45 minutes of no-action taking (in CREATED/PENDING status) is considered as expired order
+      // Transaction with more than 45 minutes of no-action taking (in CREATED/PENDING status) is
+      // considered as expired transaction
       Date startTime = new DateTime().minusDays(1).minusMinutes(45).toDate();
       Date endTime = new DateTime().minusMinutes(45).toDate();
       log.info(
@@ -60,8 +61,8 @@ public class ScheduledEcomTransaction {
 
       // Get expired transactions
       List<EcomTransaction> transactionList =
-          ecomTransactionService.findOrdersByStatusIn(startTime, endTime, listStatus);
-      log.info("(updateExpiredTransaction) numberContact: {}", transactionList.size());
+          ecomTransactionService.findTransactionByStatusIn(startTime, endTime, listStatus);
+      log.info("(updateExpiredTransaction) numberTransaction: {}", transactionList.size());
 
       // Synchronize transactions
       for (EcomTransaction transaction : transactionList) {
@@ -80,7 +81,7 @@ public class ScheduledEcomTransaction {
    * @param transaction transaction in marketplace
    */
   private void syncExpiredTransaction(EcomTransaction transaction) {
-    log.info("(syncExpiredTransaction) START, chargeId: {}", order.getChargeId());
+    log.info("(syncExpiredTransaction) START, chargeId: {}", transaction.getChargeId());
 
     String originTransactionStatus = transaction.getStatus();
 
@@ -120,7 +121,7 @@ public class ScheduledEcomTransaction {
         });
 
     // step 3: sync Bifrost with falied status
-    if (originOrderStatus != null && originOrderStatus.equals(PaymentStatus.PENDING)) {
+    if (originTransactionStatus != null && originTransactionStatus.equals(PaymentStatus.PENDING)) {
       OmiseEventData expiredEvent = new OmiseEventData();
       expiredEvent.setId(transaction.getChargeId());
       expiredEvent.setStatus(PaymentStatus.FAILED);
@@ -128,16 +129,20 @@ public class ScheduledEcomTransaction {
     }
 
     // step 4: create Marol C3 contact
-    OrderMagento orderMagento = magentoService.findOrderById(order.getOrderId());
+    OrderMagento orderMagento = magentoService.findOrderById(transaction.getOrderId());
     if (orderMagento == null) {
       log.error(
-          "etl_internal_error= ERROR_CANNOT_GET_ORDER_MAGENTO; chargeId: {}", order.getChargeId());
+          "etl_internal_error= ERROR_CANNOT_GET_ORDER_MAGENTO; orderId: {}, chargeId: {}",
+          transaction.getOrderId(),
+          transaction.getChargeId());
       return;
     }
-    UserMagento userMagento = magentoService.findUserById(order.getUserId());
+    UserMagento userMagento = magentoService.findUserById(transaction.getUserId());
     if (userMagento == null) {
       log.error(
-          "etl_internal_error= ERROR_CANNOT_GET_USER_MAGENTO; chargeId: {}", order.getChargeId());
+          "etl_internal_error= ERROR_CANNOT_GET_USER_MAGENTO; userId: {}, chargeId: {}",
+          transaction.getUserId(),
+          transaction.getChargeId());
       return;
     }
 
@@ -145,7 +150,7 @@ public class ScheduledEcomTransaction {
     if (!StringUtils.isBlank(userMagento.getPhone()))
       createC3convert(orderMagento, userMagento, transaction.getContactMethod());
 
-    log.info("(syncExpiredTransaction) END, chargeId: {}", order.getChargeId());
+    log.info("(syncExpiredTransaction) END, chargeId: {}", transaction.getChargeId());
   }
 
   /**
