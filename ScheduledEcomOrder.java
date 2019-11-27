@@ -26,7 +26,7 @@ import static vn.edu.topica.eco.epayment.constant.ErrorType.EXCEPTION;
 /**
  * This class is used to synchronize timeout transaction
  *
- * <p>author: huynv5
+ * @author: huynv5
  */
 @Component
 @Slf4j
